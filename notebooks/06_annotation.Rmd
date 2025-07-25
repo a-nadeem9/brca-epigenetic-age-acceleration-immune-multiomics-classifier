@@ -1,0 +1,484 @@
+---
+title: "Annotation"
+format:
+  pdf:
+output:
+  pdf_document:
+    latex_engine: xelatex
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown. 
+This document presents a comprehensive statistical and correlation analysis of immune scores in relation to delta age and cancer subtypes. The analysis includes:
+
+T-tests to evaluate correlations between immune scores and Delta_Hannum (a measure of delta age),
+Wilcoxon rank-sum tests to assess differences in immune scores across cancer subtypes,
+A comparative analysis of immune features using both raw data and SHAP (SHapley Additive exPlanations) features, highlighting feature importance and model interpretability.
+This analysis aims to uncover significant immune-related patterns and associations that may have biological or clinical relevance
+
+This analysis also includes GO enrichment, reactome pathway and Kegg pathway analysis of top features to further identify top pathways common among features selected and top_genes.
+
+
+
+## Immune celö
+
+
+```{r}
+
+ Immunoscores = read.csv("/mnt/home/fayyaz/MPIB-SRT/1040-pelotas/private/data/autobids/CIBERSORTx_Job2_Results.csv")
+ immune_cells = read.csv("/mnt/home/fayyaz/MPIB-SRT/1040-pelotas/private/data/autobids/immune_cells.csv")
+```
+
+
+# t-test and Wilcox-test
+
+```{r Correlation Deöta hannum and Age}
+#Initialize result data frame
+cor_results <- data.frame(
+  Cell_Type = character(),
+  Corr_with_Delta = numeric(),
+  Pval_with_Delta = numeric(),
+  Subtype_Wilcox_P = numeric(),
+  Subtype_Median_Diff = numeric()
+)
+
+ #Loop over immune cell columns
+  for (cell in colnames(immune_cells)[!colnames(immune_cells) %in% c("delta_Hannum", "Subtype_binary")]) {
+  x <- as.numeric(immune_cells[[cell]])
+  y_delta <- as.numeric(immune_cells$delta_Hannum)
+  y_subtype <- as.factor(immune_cells$Subtype_binary)
+
+  if (all(is.na(x)) || length(na.omit(x)) < 3) next
+
+ # Correlation with delta_Hannum
+  test_delta <- cor.test(x, y_delta, method = "pearson")
+
+ #  Wilcoxon test between subtypes
+   test_subtype <- wilcox.test(x ~ y_subtype)
+
+  # Median difference
+   median_diff <- median(x[y_subtype == 1], na.rm = TRUE) - 
+               median(x[y_subtype == 0], na.rm = TRUE)
+
+   cor_results <- rbind(cor_results, data.frame(
+   Cell_Type = cell,
+   Corr_with_Delta = test_delta$estimate,
+   Pval_with_Delta = test_delta$p.value,
+   Subtype_Wilcox_P = test_subtype$p.value,
+   Subtype_Median_Diff = median_diff
+  ))
+}
+
+
+```
+
+
+
+```{r}
+# Sort by p-value with delta_Hannum (or change to Pval_with_Subtype)
+# Sort by p-value (choose which one: Delta or Subtype)
+cor_results <- cor_results[order(cor_results$Pval_with_Delta), ]
+
+# View result
+print(cor_results)
+
+```
+
+```{r}
+# Adjust p-values for multiple testing (Benjamini-Hochberg method)
+cor_results$FDR_with_Delta <- p.adjust(cor_results$Pval_with_Delta, method = "BH")
+cor_results$FDR_with_Subtype <- p.adjust(cor_results$Subtype_Wilcox_P, method = "BH")
+
+# Filter significant results
+significant_fdr <- subset(cor_results, FDR_with_Delta < 0.05 | FDR_with_Subtype < 0.05)
+
+print(significant_fdr)
+
+
+```
+
+
+# Immune cel correlation with Delta age 
+```{r}
+
+cor_long = read.csv("/mnt/home/fayyaz/MPIB-SRT/1040-pelotas/private/data/autobids/cor_long.csv")
+```
+
+```{r Immune cells association with Delta Hannum and Subtypes}
+
+# Load necessary libraries
+library(reshape2)
+library(ggplot2)
+library(forcats)
+
+cor_long$Correlation_Type <- fct_recode(
+  cor_long$Correlation_Type,
+  "Δ Hannum" = "Corr_with_Delta",
+  "Subtype (Median Diff)" = "Subtype_Median_Diff"
+)
+
+# Plot
+ggplot(cor_long, aes(x = reorder(Cell_Type, Correlation), y = Correlation, fill = Correlation_Type)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  coord_flip() +
+  labs(title = "Immune Cell Association with Δ Hannum and Subtype",
+       x = "Immune Cell Type",
+       y = "Correlation / Median Difference") +
+  scale_fill_manual(values = c("Δ Hannum" = "#1f77b4", "Subtype (Median Diff)" = "#ff7f0e")) +
+  theme_minimal(base_size = 12)
+
+```
+
+#Interpretations
+  1.Link ageing to innate immunity: The two strongest Δ-age correlates are mast-cell resting and macrophage M0 infiltration → age-accelerated tumours show a “wound-healing / innate” profile.
+	2.	Highlight discordance: M1 macrophages lower Δ-age yet are slightly Luminal-skewed – evidence that not all Luminal features drive ageing in the same direction.
+	3.	Prioritise features for the SVM / downstream pathway analysis: immune cell types with consistent Δ-age and subtype signals (Mast cells, M0) are prime candidates.
+
+```{r}
+library(ggplot2)
+
+ggplot(significant_fdr,
+       aes(x = reorder(Cell_Type, Subtype_Median_Diff),
+           y = Subtype_Median_Diff,
+           fill = Subtype_Median_Diff > 0)) +
+  geom_col(width = .7) +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "#E64B35", "FALSE" = "#4DBBD5"),
+                    guide  = "none") +
+  labs(title   = "Immune Cell Association with Subtype",
+       x       = NULL,
+       y       = "Median (Basal – Luminal)") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(significant_fdr,
+       aes(x = Corr_with_Delta,
+           y = Subtype_Median_Diff,
+           label = Cell_Type)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_point(size = 3, colour = "steelblue") +
+  ggrepel::geom_text_repel(size = 3) +
+  labs(title = "Significant immune cell types",
+       x = "Spearman ρ with Δ-age",
+       y = "Median (Basal – Luminal)") +
+  theme_minimal()
+
+
+```
+```{r}
+ subtype_sig  = read.csv("/mnt/home/fayyaz/MPIB-SRT/1040-pelotas/private/data/autobids/subtype_sig")
+```
+
+#Immune cell correlation with Subtypes
+
+```{r Bar Graph}
+library(ggplot2)
+library(dplyr)
+
+
+# Order Cell_Type by correlation for a nicer bar plot
+subtype_sig$Cell_Type <- factor(subtype_sig$Cell_Type,
+                               levels = subtype_sig$Cell_Type[order(subtype_sig$Correlation)])
+
+# Plot bar graph
+ggplot(subtype_sig, aes(x = Cell_Type, y = Correlation, fill = Subtype_Label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +  # flip for horizontal bars
+  scale_fill_manual(values = c("Basal (1)" = "#ff7f0e", "Luminal (0)" = "#1f77b4")) +
+  labs(
+    title = "Correlation of Immune Cells with Subtypes)",
+    x = "Immune Cell Type",
+    y = "Pearson Correlation",
+    fill = "Subtype Association"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+
+
+```
+
+##Interpretation
+
+The result indicates that certain Immune cells such as Tcells follicular and Macrophages show high correlation with luminal subtypes. while Mast cell resting and Macrophages show high correlation with basal subtypes. 
+
+
+
+
+# Immune features Comparison among raw data comparison and SHAP features
+
+```{r}
+# Required libraries
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(patchwork)
+
+# 1) Construct the data frame
+df <- tibble::tibble(
+  cell         = c(
+    "T cells follicular helper",
+    "Macrophages M0",
+    "Mast cells resting",
+    "T cells CD4 memory activated"
+  ),
+  correlation  = c( 0.30,  0.24, -0.25,  0.22),
+  shap_mean    = c( 0.16,  0.30,  0.18,  0.15)
+) %>%
+  # wrap long labels at ~20 chars
+  mutate(label = str_wrap(cell, 20)) %>%
+  # order by descending correlation
+  arrange(desc(correlation)) %>%
+  mutate(label = factor(label, levels = label),
+         subtype = if_else(correlation >= 0, "Basal", "Luminal"))
+```
+
+
+```{r}
+# Left panel: correlation bar plot
+p_corr <- ggplot(df, aes(x = correlation, y = label, fill = subtype)) +
+  geom_col(color = "white", width = 0.6) +
+  scale_fill_manual(values = c(Basal = "#ff7f0e", Luminal = "#1f77b4")) +
+  geom_vline(xintercept = 0, color = "gray70") +
+  labs(
+    title = "Correlation\n(Basal vs Luminal)",
+    x     = "Pearson r",
+    y     = NULL,
+    fill  = "Subtype"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank()
+  )
+# Right panel: SHAP importance bar plot
+p_shap <- ggplot(df, aes(x = shap_mean, y = label)) +
+  geom_col(fill = "#2ca02c", color = "white", width = 0.6) +
+  geom_vline(xintercept = 0, color = "gray70") +
+  labs(
+    title = "SHAP Importance\n(LumA vs LumB)",
+    x     = "mean(|SHAP value|)",
+    y     = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank()
+  )
+
+#  Combine panels with a shared title
+(p_corr | p_shap) +
+  plot_annotation(
+    title = "Immune Features Driving Subtypes Separation",
+    theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
+  )
+```
+#Interpretations
+
+Left: how each immune cell correlates with Basal vs Luminal (orange positive, blue negative).
+
+Right: how strongly each same cell drives the LumA vs LumB decision (green SHAP)
+
+
+
+
+# Featurea Annotation
+
+
+```{r}
+# Install BiocManager if needed
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager", quiet = TRUE)
+}
+
+# List all packages you need
+pkgs <- c(
+  "clusterProfiler",
+  "org.Hs.eg.db",
+  "ReactomePA",
+  "AnnotationDbi",
+  "dplyr",
+  "tibble",
+  "ggplot2"
+)
+
+# Install (no asking, no updating everything)
+suppressWarnings(
+  BiocManager::install(pkgs, ask = FALSE, update = FALSE, quiet = TRUE)
+)
+```
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(clusterProfiler)
+  library(org.Hs.eg.db)
+  library(ReactomePA)
+  library(AnnotationDbi)
+  library(dplyr)
+  library(tibble)
+  library(ggplot2)
+})
+
+sessionInfo()
+
+```
+
+# Features extracted from SHAP
+
+```{r}
+# 1) Ensembl ID vector
+features_all <- c(
+  "ENSG00000054598","ENSG00000186832","ENSG0000005513",
+  "ENSG00000198729","ENSG00000186868","ENSG00000154548",
+  "ENSG00000259793","ENSG00000172425","ENSG00000254615",
+  "ENSG00000082175","ENSG00000204385","ENSG00000148513",
+  "ENSG00000236313","ENSG00000135912","ENSG00000234918"
+)
+
+
+features_sig <- features_all
+```
+
+
+```{r}
+is_ensembl <- function(x) grepl("^ENSG\\d{11}$", x)
+
+bad_all <- features_all[!is_ensembl(features_all)]
+if (length(bad_all)) {
+  message("Dropping malformed Ensembl IDs (ALL): ",
+          paste(bad_all, collapse = ", "))
+}
+features_all <- features_all[is_ensembl(features_all)]
+
+if (length(features_sig)) {
+  bad_sig <- features_sig[!is_ensembl(features_sig)]
+  if (length(bad_sig)) {
+    message("Dropping malformed Ensembl IDs (SIG): ",
+            paste(bad_sig, collapse = ", "))
+  }
+  features_sig <- features_sig[is_ensembl(features_sig)]
+}
+
+length(features_all)
+length(features_sig)
+
+```
+
+```{r}
+map_all <- bitr(features_all,
+                fromType = "ENSEMBL",
+                toType   = "ENTREZID",
+                OrgDb    = org.Hs.eg.db)
+
+entrez_all <- unique(map_all$ENTREZID)
+length(entrez_all)
+
+if (length(features_sig)) {
+  map_sig <- bitr(features_sig,
+                  fromType = "ENSEMBL",
+                  toType   = "ENTREZID",
+                  OrgDb    = org.Hs.eg.db)
+  entrez_sig <- unique(map_sig$ENTREZID)
+  length(entrez_sig)
+} else {
+  entrez_sig <- character(0)
+}
+
+```
+
+```{r}
+ego_all <- enrichGO(
+  gene          = entrez_all,
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "ENTREZID",
+  ont           = "BP",
+  pAdjustMethod = "BH",
+  pvalueCutoff  = 1,
+  qvalueCutoff  = 1,
+  readable      = TRUE
+)
+
+```
+
+```{r}
+ekegg_all <- enrichKEGG(
+  gene          = entrez_all,
+  organism      = "hsa",
+  keyType       = "ncbi-geneid",
+  pvalueCutoff  = 1,
+  qvalueCutoff  = 1
+)
+
+# Make gene IDs readable (map Entrez back to gene symbols)
+ekegg_all <- setReadable(ekegg_all, OrgDb = org.Hs.eg.db, keyType = "ENTREZID")
+```
+```{r}
+ereact_all <- enrichPathway(
+  gene          = entrez_all,
+  organism      = "human",
+  pvalueCutoff  = 1,
+  qvalueCutoff  = 1,
+  readable      = TRUE
+)
+
+```
+
+```{r}
+# Load the stringr library for text wrapping
+library(stringr)
+
+# --- Enhanced Bar Plot Function ---
+safe_barplot <- function(enrich_result, title, showCategory = 20) {
+  # Check if there's anything to plot
+  if (!is.null(enrich_result) && nrow(as.data.frame(enrich_result)) > 0) {
+    p <- barplot(enrich_result, showCategory = showCategory) +
+      labs(
+        title = title,
+        x = "Gene Ratio",
+        y = "Enriched Term"
+      ) +
+      # Wrap long labels on the y-axis to 40 characters
+      scale_y_discrete(labels = function(x) str_wrap(x, width = 40)) +
+      theme_minimal(base_size = 14) +
+      theme(plot.title = element_text(hjust = 0.5)) # Center the title
+
+    print(p)
+  } else {
+    message("No terms to plot for: ", title)
+  }
+}
+
+```
+
+```{r}
+# Filter each result for adjusted p-value < 0.05
+ego_all_df <- as.data.frame(ego_all)
+ekegg_all_df <- as.data.frame(ekegg_all)
+ereact_all_df <- as.data.frame(ereact_all)
+
+ego_sig <- ego_all_df %>% filter(p.adjust < 0.05)
+ekegg_sig <- ekegg_all_df %>% filter(p.adjust < 0.05)
+ereact_sig <- ereact_all_df %>% filter(p.adjust < 0.05)
+
+# See how many significant GO terms you have
+print(paste("Found", nrow(ego_sig), "significant GO terms."))
+```
+
+```{r}
+safe_barplot(ego_all, "GO BP Enrichment (All Genes)")
+```
+
+```{r}
+safe_barplot(ekegg_all, "KEGG Pathway Enrichment (All Genes)")
+```
+
+```{r}
+safe_barplot(ereact_all, "Reactome Pathway Enrichment (All Genes)")
+```
+

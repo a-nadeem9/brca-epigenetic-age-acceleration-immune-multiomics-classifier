@@ -1,0 +1,244 @@
+---
+title: "EpigeneticAge_Statistical_Analysis"
+format:
+  pdf:
+output:
+  pdf_document:
+    latex_engine: xelatex
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+This markdown provides a detailed statistical analysis of delta age across different subtypes. It begins by performing t-tests for all three epigenetic clocks—Horvath, PhenoAge, and Hannum—in relation to the subtypes. Scatter plots are then presented to illustrate cross-clock differences and consensus patterns. In addition, box plots of delta age by subtype are included to highlight key separation trends. Finally, a linear model is fitted to further explore these patterns and identify the most suitable clock for downstream analysis.
+
+
+```{r Load the data}
+
+delta_age_with_chrono_age = read.csv("/mnt/home/fayyaz/MPIB-SRT/1040-pelotas/private/data/autobids/delta_age_with_chrono_age.csv")
+clinical_data = read.csv("/mnt/home/fayyaz/MPIB-SRT/1040-pelotas/private/data/autobids/clinical_data.csv")
+```
+
+
+```{r t-tests}
+
+# t-tests
+#t_results <- lapply(delta_vars, function(var) {
+#  formula <- as.formula(paste(var, "~ Subtype_binary"))
+# t.test(formula, data = delta_age_with_chrono_age)
+# })
+```
+
+
+```{r}
+# Run the t-tests
+# Run the t-tests
+t1 <- t.test(delta_Horvath ~ Subtype_binary, data = delta_age_with_chrono_age)
+t2 <- t.test(delta_Hannum ~ Subtype_binary, data = delta_age_with_chrono_age)
+t3 <- t.test(delta_PhenoAge ~ Subtype_binary, data = delta_age_with_chrono_age)
+
+# Function to return a summary list (instead of printing with cat)
+ttest_summary <- function(t_result) {
+  list(
+    t_statistic = round(t_result$statistic, 3),
+    df = round(t_result$parameter, 2),
+    p_value = signif(t_result$p.value, 4),
+    conf_int = round(t_result$conf.int, 3),
+    group_means = round(t_result$estimate, 3)
+  )
+}
+
+# Print results for each test using knitr-friendly output
+results_horvath <- ttest_summary(t1)
+results_hannum <- ttest_summary(t2)
+results_pheno <- ttest_summary(t3)
+
+# Display as printed outputs in Rmd
+results_horvath
+results_hannum
+results_pheno
+
+
+```
+
+#Interpretation
+
+All three Δ-age clocks show highly significant differences between the Basal and Luminal subtypes.
+
+Δ-Hannum and Δ-Horvath show younger biological age in Basal, while Δ-PhenoAge also shows significantly
+younger age in Basal but with generally higher values.
+
+The effect size appears largest for Hannum and Horvath (based on means and confidence intervals).
+
+
+
+```{r Scatter-plots}
+
+library(ggplot2)
+
+for (clock in c("Horvath", "Hannum", "PhenoAge")) {
+  p <- ggplot(delta_age_with_chrono_age, aes(x = chrono_age, y = .data[[clock]], 
+                                             colour = Subtype_binary)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, linetype = "dashed") +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(x = "Chronological age", y = paste(clock, "DNAm age")) +
+    ggtitle(paste("DNAm vs Chronological Age -", clock)) +
+    theme_minimal()
+  print(p)
+}
+
+
+```
+
+#Interpretation
+Cross-clock consensus
+Luminal breast cancers: Epigenetic age > chronological age in all clocks (positive ΔAge)
+Age acceleration magnitude: PhenoAge > Horvath > Hannum
+Implies hormone-regulated, more-differentiated tumours accrue age-related methylation.
+
+Basal breast cancers
+ Epigenetic age ≈ or < chronological age (neutral or negative ΔAge)
+ Weak slope ⇒ DNAm age changes little with patient age
+ Fits an undifferentiated, stem-like, often younger patient profile.
+
+
+Why this matters
+		Prognostic potential – ΔAge may help refine risk within each subtype.
+	  Biology – Subtype-specific ageing programs could influence tumour evolution and therapy response.
+	 	Next analyses – Correlate ΔAge with immune infiltration, mutation burden, and survival 
+	to test mechanistic links.
+
+
+
+
+# Boxplots 
+
+
+```{r Boxplot_binary }
+library(ggplot2)
+library(patchwork)
+
+plot_list <- list()
+
+for (clock in c("Horvath", "Hannum", "PhenoAge")) {
+  delta_col <- paste0("delta_", clock)
+  
+  p <- ggplot(delta_age_with_chrono_age, aes(x = Subtype_binary, y = .data[[delta_col]], 
+                                             fill = Subtype_binary)) +
+    geom_violin(trim = FALSE, alpha = 0.6) +
+    geom_boxplot(width = 0.15, outlier.shape = NA) +
+    labs(
+      x = NULL,  # Remove x-axis label
+      y = paste("Δ-age (", clock, ")", sep = ""),
+      title = paste("Age_acce -", clock)
+    ) +
+    theme_minimal() +
+    guides(fill = "none")
+  
+  plot_list[[clock]] <- p
+}
+
+# Combine plots and add a common x-axis label at the bottom
+combined_plot <- (plot_list$Horvath + plot_list$Hannum + plot_list$PhenoAge) &
+  theme(axis.title.x = element_blank())  # Avoid individual x-axis labels
+
+# Add common x-label manually with patchwork annotation
+(combined_plot + 
+  plot_annotation(
+    caption = "Subtype_binary"
+  )) & 
+  theme(
+    plot.caption = element_text(hjust = 0.5, size = 12, face = "bold")
+  )
+      
+
+```          
+
+
+
+
+```{r Boxplot_triclass }
+library(ggplot2)
+library(patchwork)
+
+plot_list <- list()
+
+for (clock in c("Horvath", "Hannum", "PhenoAge")) {
+  delta_col <- paste0("delta_", clock)
+  
+  p <- ggplot(delta_age_with_chrono_age, aes(x = Subtype, y = .data[[delta_col]], fill = Subtype)) +
+    geom_violin(trim = FALSE, alpha = 0.6) +
+    geom_boxplot(width = 0.15, outlier.shape = NA) +
+    labs(
+      x = NULL,  # Remove x-axis label
+      y = paste("Δ-age (", clock, ")", sep = ""),
+      title = paste("Age_acce -", clock)
+    ) +
+    theme_minimal() +
+    guides(fill = "none")
+  
+  plot_list[[clock]] <- p
+}
+
+# Combine plots and add a common x-axis label at the bottom
+combined_plot <- (plot_list$Horvath + plot_list$Hannum + plot_list$PhenoAge) &
+  theme(axis.title.x = element_blank())  # Avoid individual x-axis labels
+
+# Add common x-label manually with patchwork annotation
+combined_plot + plot_annotation(
+  caption = "Subtype"
+) & theme(plot.caption = element_text(hjust = 0.5, size = 12, face = "bold"))
+
+
+```
+Interpretation
+
+In case of bi-class and tri class, Hannum clock shows higher Age accelaration than Hovarth and PhenoAge.
+
+Across all three clocks, Luminal tumours display positive Δ-Age (epigenetic age acceleration).
+
+Basal tumours cluster around zero or negative Δ-Age, indicating epigenetic age deceleration.
+
+Confirms subtype-specific ageing biology: hormone-driven Luminals appear “older”, progenitor-like Basals “younger.”
+
+
+# Linear Model
+
+```{r}
+### Adding Linear Model
+for (clock in c("Horvath", "Hannum", "PhenoAge")) {
+  delta_col <- paste0("delta_", clock)
+  
+  # Fit model
+  fit_2 <- lm(formula = as.formula(
+    paste0(delta_col, " ~ Subtype + age_at_index + ajcc_pathologic_stage")),
+    data = clinical_data
+  )
+  
+  cat("\n\n==== Linear Model Summary for Δ-age (", clock, ") ====\n")
+  print(summary(fit_2))
+
+}
+
+```
+
+# Interpretation & Implications
+
+Subtype Effect: All three epigenetic clocks detect significantly higher Δ-age in Luminal subtypes, 
+indicating accelerated biological aging in these patients.
+
+Age Effect: Older patients tend to have lower Δ-age, suggesting that epigenetic age plateaus or compresses 
+relative to chronological age in older individuals.
+
+Stage Effect: Surprisingly, tumor stage does not significantly predict Δ-age in any model. This might
+indicate that biological age acceleration is more subtype-driven than progression-driven.
+
+Model Strength:
+Hannum has the best overall fit (R² ≈ 0.30), followed by Horvath, and PhenoAge lags significantly behind.
+
+PhenoAge may reflect more systemic, metabolic, or immune-related aging not captured in this model.
+
