@@ -43,7 +43,7 @@ brca-epigenetic-age-acceleration-immune-multiomics-classifier
 │   ├── 03_immune_score.ipynb
 │   ├── 04_binary_classification.ipynb
 │   ├── 05_multiclass_classification.ipynb
-│   └── 06_annotation.Rmd
+│   └── 06_annotation.rmd
 ├── scripts
 │   ├── 01_download_tcga.R
 │   ├── 02_merge_matched_data.R
@@ -62,12 +62,12 @@ brca-epigenetic-age-acceleration-immune-multiomics-classifier
 |---|---|
 | **01a_data_preprocessing.ipynb** | Load/clean clinical & sample metadata, harmonise IDs, basic QC. |
 | **01b_rna_preprocessing.ipynb** | RNA‑seq normalisation, filtering, optional batch correction; produce expression features. |
-| **01c_methylation_preprocessing.ipynb** | Probe/array QC, normalisation, batch correction of methylation data. |
-| **02a_delta_age_calculation.ipynb** | Compute DNAm age via chosen clock(s) (e.g., Horvath, PhenoAge, GrimAge) and derive **ΔAge**. |
-| **02b_epigenetic_age_statistical_analysis.rmd** | tests, visualizes, and models epigenetic age acceleration and **ΔAge**.. |
-| **03_immune_score.ipynb** | Generate/ingest immune deconvolution scores (e.g., CIBERSORT, TIMER, xCell) and assemble immune features. |
-| **04_binary_classification.ipynb** | Train & evaluate binary models (e.g., Basal vs. Luminal): AUROC/AUPRC, SHAP/feature importances. |
-| **05_multiclass_classification.ipynb** | Train & evaluate multiclass models (e.g., PAM50): macro/micro metrics, confusion matrices, SHAP. |
+| **01c_methylation_preprocessing.ipynb** | Probe/array QC, normalisation, removal of null values. |
+| **02a_delta_age_calculation.ipynb** | Compute DNAm age via chosen clock(s) (Horvath, PhenoAge, GrimAge) and derive **ΔAge**. |
+| **02b_epigenetic_age_statistical_analysis.rmd** | tests, visualizes, and models epigenetic age acceleration and **ΔAge**. |
+| **03_immune_score.ipynb** | Generate/ingest immune deconvolution scores (CIBERSORT) and assemble immune features. |
+| **04_binary_classification.ipynb** | Train & evaluate binary models (Basal vs. Luminal): AUROC/AUPRC, SHAP/feature importances. |
+| **05_multiclass_classification.ipynb** | Train & evaluate multiclass models (Basal vs. Luminal A vs. Luminal B):: macro/micro metrics, confusion matrices, SHAP. |
 | **06_annotation.Rmd** | Biological/clinical interpretation, pathway enrichment, figure/table export. |
 
 
