@@ -62,7 +62,7 @@ brca-epigenetic-age-acceleration-immune-multiomics-classifier
 |---|---|
 | **01a_data_preprocessing.ipynb** | Load/clean clinical & sample metadata, harmonise IDs, basic QC. |
 | **01b_rna_preprocessing.ipynb** | RNA‑seq normalisation, filtering, optional batch correction; produce expression features. |
-| **01c_methylation_preprocessing.ipynb** | Probe/array QC, normalisation, batch correction of methylation data. |
+| **01c_methylation_preprocessing.ipynb** | Probe/array QC, normalisation, removal of null values. |
 | **02a_delta_age_calculation.ipynb** | Compute DNAm age via chosen clock(s) (Horvath, PhenoAge, GrimAge) and derive **ΔAge**. |
 | **02b_epigenetic_age_statistical_analysis.rmd** | tests, visualizes, and models epigenetic age acceleration and **ΔAge**. |
 | **03_immune_score.ipynb** | Generate/ingest immune deconvolution scores (CIBERSORT) and assemble immune features. |
