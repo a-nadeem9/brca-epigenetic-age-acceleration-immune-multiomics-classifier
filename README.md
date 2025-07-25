@@ -1,6 +1,6 @@
 # BRCA Epigenetic Age Acceleration + Immune + Multi‑omics Classifier
 
-> **Goal**: Quantify **epigenetic age acceleration** in breast cancer, integrate it with **immune scores** and other **multi‑omics** features, and train/evaluate machine‑learning classifiers (binary & multiclass). Epigenetic clocks (e.g., Horvath, PhenoAge, GrimAge) have been linked to breast cancer biology and risk, but results are mixed and tissue‑/clock‑dependent — motivating a careful, reproducible analysis like this one. [1–6]
+> **Goal**: Quantify **epigenetic age acceleration** in breast cancer, integrate it with **immune scores** and other **multi‑omics** features, and train/evaluate machine‑learning classifiers (binary & multiclass). Epigenetic clocks (e.g., Horvath, PhenoAge, GrimAge) have been linked to breast cancer biology and risk, but results are mixed and tissue‑/clock‑dependent, motivating a careful, reproducible analysis like this one. [1–6]
 
 <p align="left">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue.svg">
