@@ -23,7 +23,7 @@ conda activate brca-eaa
 pip install -r requirements.txt
 
 # 4) Launch notebooks
-jupyter lab   # or: jupyter notebook
+jupyter lab
 ```
 
 > **R side:** The `scripts/` folder contains lightweight R utilities. Make sure you have **R ≥ 4.0** and install the required packages.
